@@ -40,9 +40,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   Future<void> _loadUnpaidOldBills() async {
     try {
       final bills = await DatabaseHelper.instance.getBillsByCustomer(widget.customer.id!);
+      final now = DateTime.now();
       final unpaid = bills.where((b) {
-        // Lấy hóa đơn chưa thanh toán và khác hóa đơn hiện tại đang xem
-        return !b.isPaid && b.id != widget.bill.id;
+        final isCurrentMonth = b.date.month == now.month && b.date.year == now.year;
+        // Loại bill đang xem VÀ loại mọi bill cùng tháng hiện tại (kể cả bill trùng lặp khác id)
+        return !b.isPaid && b.id != widget.bill.id && !isCurrentMonth;
       }).toList();
 
       if (mounted) {
