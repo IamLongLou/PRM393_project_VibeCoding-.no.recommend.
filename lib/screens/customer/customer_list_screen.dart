@@ -70,7 +70,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
   }
 
   Widget _buildHeader(BuildContext context) {
-    String title = _tabController.index == 0 ? 'Chưa thu tiền' : 'Lịch sử thu';
+    String title = _tabController.index == 0 ? 'Chưa ghi số' : 'Lịch sử ghi nước';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Row(
@@ -133,7 +133,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
       decoration: BoxDecoration(color: Theme.of(context).cardTheme.color, borderRadius: BorderRadius.circular(12)),
       child: TabBar(
         controller: _tabController,
-        tabs: const [Tab(text: 'Chưa thu'), Tab(text: 'Đã thu')],
+        tabs: const [Tab(text: 'Chưa ghi số'), Tab(text: 'Đã ghi số')],
         labelColor: Colors.blue,
         unselectedLabelColor: Colors.grey,
         indicator: BoxDecoration(color: Colors.blue.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
@@ -149,7 +149,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
         if (provider.isLoading && provider.customers.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
-        final list = provider.customers.where((c) => c.status != CollectionStatus.completed).toList();
+        final list = provider.customers.where((c) => !provider.recordedCustomerCodes.contains(c.code)).toList();
         return _buildListView(list, isPending: true);
       },
     );
@@ -161,7 +161,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
         if (custProv.isLoading && custProv.customers.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
-        final list = custProv.customers.where((c) => c.status == CollectionStatus.completed).toList();
+        final list = custProv.customers.where((c) => custProv.recordedCustomerCodes.contains(c.code)).toList();
         return FutureBuilder<List<Bill>>(
           future: Provider.of<BillingProvider>(context, listen: false).getAllBills(),
           builder: (context, snapshot) {
@@ -190,7 +190,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.black.withValues(alpha: 0.03), 
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03), 
         borderRadius: BorderRadius.circular(15)
       ),
       child: Row(

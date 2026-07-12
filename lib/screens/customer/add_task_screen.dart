@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/customer.dart';
-import '../../services/customer_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
   const AddTaskScreen({super.key});
@@ -64,7 +62,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -150,7 +148,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

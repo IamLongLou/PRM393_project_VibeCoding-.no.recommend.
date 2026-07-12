@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../models/customer.dart';
+import '../../models/bill.dart';
+import '../../providers/customer_provider.dart';
+import '../../services/database_helper.dart';
 import '../../routes/app_routes.dart';
 import 'customer_history_screen.dart';
 import 'meter_reading_screen.dart';
 import 'route_optimization_screen.dart';
+import 'receipt_screen.dart';
 
 class CustomerDetailScreen extends StatelessWidget {
   final Customer customer;
@@ -41,24 +46,50 @@ class CustomerDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _buildProfileHeader(),
-            const SizedBox(height: 20),
-            _buildQuickActions(),
-            const SizedBox(height: 25),
-            _buildMainReadingCard(),
-            const SizedBox(height: 20),
-            _buildLocationSection(context),
-            const SizedBox(height: 20),
-            _buildHistoryAccess(context),
-            const SizedBox(height: 30),
-            _buildActionButton(context),
-            const SizedBox(height: 40),
-          ],
-        ),
+      body: Consumer<CustomerProvider>(
+        builder: (context, customerProvider, _) {
+          final isRecordedThisMonth = customerProvider.recordedCustomerCodes.contains(customer.code);
+          return FutureBuilder<List<Bill>>(
+            key: ValueKey('detail_${customer.id}_${customerProvider.refreshKey}'),
+            future: DatabaseHelper.instance.getBillsByCustomer(customer.id!),
+            builder: (context, snapshot) {
+              final bills = snapshot.data ?? [];
+              final now = DateTime.now();
+
+              // Hóa đơn của tháng hiện tại (nếu có)
+              Bill? currentMonthBill;
+              try {
+                currentMonthBill = bills.firstWhere(
+                  (b) => b.date.month == now.month && b.date.year == now.year,
+                );
+              } catch (_) {}
+
+              // Hóa đơn gần nhất bất kỳ (dùng cho _buildMainReadingCard)
+              Bill? latestBill;
+              if (bills.isNotEmpty) latestBill = bills.first;
+
+              return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildProfileHeader(),
+                    const SizedBox(height: 20),
+                    _buildQuickActions(),
+                    const SizedBox(height: 25),
+                    _buildMainReadingCard(latestBill),
+                    const SizedBox(height: 20),
+                    _buildLocationSection(context),
+                    const SizedBox(height: 20),
+                    _buildHistoryAccess(context),
+                    const SizedBox(height: 30),
+                    _buildActionButton(context, isRecordedThisMonth, currentMonthBill),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(context),
     );
@@ -91,7 +122,7 @@ class CustomerDetailScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('KH·2024-8892', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            Text('KH · ${customer.code}', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -132,7 +163,10 @@ class CustomerDetailScreen extends StatelessWidget {
     ),
   );
 
-  Widget _buildMainReadingCard() {
+  Widget _buildMainReadingCard(Bill? latestBill) {
+    final lastMonthConsumption = latestBill != null ? '${latestBill.consumption.toInt()} m³' : 'N/A';
+    final lastReadingDate = latestBill != null ? DateFormat('dd/MM/yyyy').format(latestBill.date) : 'N/A';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(25),
@@ -170,13 +204,13 @@ class CustomerDetailScreen extends StatelessWidget {
               const SizedBox(width: 5),
               const Text('THÁNG TRƯỚC', style: TextStyle(color: Colors.white60, fontSize: 10)),
               const SizedBox(width: 5),
-              const Text('22 m³', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(lastMonthConsumption, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
               const Spacer(),
               const Icon(Icons.access_time, color: Colors.white70, size: 16),
               const SizedBox(width: 5),
               const Text('GHI GẦN NHẤT', style: TextStyle(color: Colors.white60, fontSize: 10)),
               const SizedBox(width: 5),
-              Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(lastReadingDate, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           )
         ],
@@ -281,7 +315,39 @@ class CustomerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton(BuildContext context) {
+  Widget _buildActionButton(BuildContext context, bool isRecordedThisMonth, Bill? currentMonthBill) {
+    final isPaid = currentMonthBill?.isPaid ?? false;
+
+    // Xác định màu sắc và nhãn nút theo trạng thái tháng hiện tại
+    Color btnColor;
+    IconData btnIcon;
+    String btnLabel;
+    VoidCallback? btnAction;
+
+    if (!isRecordedThisMonth) {
+      // Chưa ghi số tháng này
+      btnColor = Colors.blue;
+      btnIcon = Icons.edit_note;
+      btnLabel = 'Ghi chỉ số mới';
+      btnAction = () => Navigator.push(context, MaterialPageRoute(builder: (_) => MeterReadingScreen(customer: customer)));
+    } else if (!isPaid) {
+      // Đã ghi số nhưng KH chưa thanh toán
+      btnColor = Colors.orange;
+      btnIcon = Icons.receipt_long;
+      btnLabel = 'Xem hóa đơn – Chờ thanh toán';
+      btnAction = currentMonthBill != null
+          ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptScreen(customer: customer, bill: currentMonthBill)))
+          : null;
+    } else {
+      // Đã ghi số và KH đã thanh toán xong
+      btnColor = Colors.green;
+      btnIcon = Icons.check_circle_outline;
+      btnLabel = 'Xem biên lai đã thanh toán';
+      btnAction = currentMonthBill != null
+          ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptScreen(customer: customer, bill: currentMonthBill)))
+          : null;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -289,9 +355,15 @@ class CustomerDetailScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MeterReadingScreen(customer: customer))),
-              icon: const Icon(Icons.edit_note, size: 24),
-              label: const Text('Ghi chỉ số mới'),
+              onPressed: btnAction,
+              icon: Icon(btnIcon, size: 24),
+              label: Text(btnLabel),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: btnColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
             ),
           ),
           const SizedBox(height: 12),

@@ -25,7 +25,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
 //        createUser("admin", "admin123", "Quản Trị Viên", UserRole.ADMIN, "admin@water.com", "0987654321", null);
 //        createUser("nhanvien01", "123456", "Nguyễn Văn A", UserRole.STAFF, "nguyenvana@gmail.com", "0912345678", null);
-        createUser("khachhang16", "123456", "Lê Minh Triết", UserRole.USER, "trietle@gmail.com", "0901234567", "KH001");
+        // createUser("khachhang16", "123456", "Lê Minh Triết", UserRole.USER, "trietle@gmail.com", "0901234567", "KH001");
 //        createUser("abc", "123", "Khách Hàng Mới", UserRole.USER, "abc@gmail.com", "0900000000", "KH002");
     }
 

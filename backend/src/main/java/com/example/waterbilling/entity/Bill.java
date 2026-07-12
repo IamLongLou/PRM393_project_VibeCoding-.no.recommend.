@@ -60,4 +60,7 @@ public class Bill {
 
     @Column(name = "is_synced", nullable = false)
     private Boolean synced = false;
+
+    @Column(name = "is_paid", nullable = false)
+    private Boolean paid = false;
 }

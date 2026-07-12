@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/sync_provider.dart';
+import '../../providers/customer_provider.dart';
 
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key});
@@ -12,7 +13,33 @@ class _SyncScreenState extends State<SyncScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<SyncProvider>().fetchUnsynced());
+    Future.microtask(() {
+      if (mounted) {
+        context.read<SyncProvider>().fetchUnsyncedBills();
+      }
+    });
+  }
+
+  Future<void> _doSync() async {
+    final syncProvider = context.read<SyncProvider>();
+    final customerProvider = context.read<CustomerProvider>();
+    final success = await syncProvider.syncAll(customerProvider);
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Đồng bộ thành công! Danh sách khách hàng đã được cập nhật.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ ${syncProvider.lastError ?? "Đồng bộ thất bại"}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -26,7 +53,7 @@ class _SyncScreenState extends State<SyncScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withValues(alpha: 0.1),
             child: Text('Có ${bills.length} hóa đơn chờ đồng bộ.'),
           ),
           Expanded(
@@ -41,7 +68,7 @@ class _SyncScreenState extends State<SyncScreen> {
           Padding(
             padding: const EdgeInsets.all(20),
             child: ElevatedButton(
-              onPressed: syncProvider.isSyncing || bills.isEmpty ? null : () => syncProvider.syncAll(),
+              onPressed: syncProvider.isSyncing || bills.isEmpty ? null : _doSync,
               child: Text(syncProvider.isSyncing ? 'Đang gửi...' : 'Đồng bộ ngay'),
             ),
           )

@@ -14,11 +14,12 @@ class Bill {
   final double totalAmount;
   final String? imagePath;
   final bool isSynced;
+  final bool isPaid;
 
-  Bill({this.id, required this.customerId, this.customerName, this.customerCode, required this.billCode, required this.date, required this.oldReading, required this.newReading, required this.consumption, required this.unitPrice, required this.amount, required this.vat, required this.totalAmount, this.imagePath, this.isSynced = false});
+  Bill({this.id, required this.customerId, this.customerName, this.customerCode, required this.billCode, required this.date, required this.oldReading, required this.newReading, required this.consumption, required this.unitPrice, required this.amount, required this.vat, required this.totalAmount, this.imagePath, this.isSynced = false, this.isPaid = false});
 
   Map<String, dynamic> toMap() => {
-    'id': id, 'customerId': customerId, 'customerName': customerName, 'customerCode': customerCode, 'billCode': billCode, 'date': date.toIso8601String(), 'oldReading': oldReading, 'newReading': newReading, 'consumption': consumption, 'unitPrice': unitPrice, 'amount': amount, 'vat': vat, 'totalAmount': totalAmount, 'imagePath': imagePath, 'isSynced': isSynced ? 1 : 0,
+    'id': id, 'customerId': customerId, 'customerName': customerName, 'customerCode': customerCode, 'billCode': billCode, 'date': date.toIso8601String(), 'oldReading': oldReading, 'newReading': newReading, 'consumption': consumption, 'unitPrice': unitPrice, 'amount': amount, 'vat': vat, 'totalAmount': totalAmount, 'imagePath': imagePath, 'isSynced': isSynced ? 1 : 0, 'isPaid': isPaid ? 1 : 0,
   };
 
   factory Bill.fromMap(Map<String, dynamic> map) => Bill(
@@ -37,11 +38,12 @@ class Bill {
     totalAmount: (map['totalAmount'] as num).toDouble(),
     imagePath: map['imagePath'],
     isSynced: map['isSynced'] == 1 || map['isSynced'] == true,
+    isPaid: map['isPaid'] == 1 || map['isPaid'] == true,
   );
 
-  Bill copyWith({int? id, int? customerId, String? customerName, String? customerCode, String? billCode, DateTime? date, int? oldReading, int? newReading, double? consumption, double? unitPrice, double? amount, double? vat, double? totalAmount, String? imagePath, bool? isSynced}) {
+  Bill copyWith({int? id, int? customerId, String? customerName, String? customerCode, String? billCode, DateTime? date, int? oldReading, int? newReading, double? consumption, double? unitPrice, double? amount, double? vat, double? totalAmount, String? imagePath, bool? isSynced, bool? isPaid}) {
     return Bill(
-      id: id ?? this.id, customerId: customerId ?? this.customerId, customerName: customerName ?? this.customerName, customerCode: customerCode ?? this.customerCode, billCode: billCode ?? this.billCode, date: date ?? this.date, oldReading: oldReading ?? this.oldReading, newReading: newReading ?? this.newReading, consumption: consumption ?? this.consumption, unitPrice: unitPrice ?? this.unitPrice, amount: amount ?? this.amount, vat: vat ?? this.vat, totalAmount: totalAmount ?? this.totalAmount, imagePath: imagePath ?? this.imagePath, isSynced: isSynced ?? this.isSynced,
+      id: id ?? this.id, customerId: customerId ?? this.customerId, customerName: customerName ?? this.customerName, customerCode: customerCode ?? this.customerCode, billCode: billCode ?? this.billCode, date: date ?? this.date, oldReading: oldReading ?? this.oldReading, newReading: newReading ?? this.newReading, consumption: consumption ?? this.consumption, unitPrice: unitPrice ?? this.unitPrice, amount: amount ?? this.amount, vat: vat ?? this.vat, totalAmount: totalAmount ?? this.totalAmount, imagePath: imagePath ?? this.imagePath, isSynced: isSynced ?? this.isSynced, isPaid: isPaid ?? this.isPaid,
     );
   }
 }

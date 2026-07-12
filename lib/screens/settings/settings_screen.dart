@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,81 +14,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoSync = true;
   bool _biometric = false;
-  String _userName = 'Nguyen Van A';
-  String _staffId = 'NV-2024-001';
-
-  void _showEditProfileDialog() {
-    final nameController = TextEditingController(text: _userName);
-    final idController = TextEditingController(text: _staffId);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Chỉnh sửa hồ sơ', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Họ và tên', hintText: 'Nhập tên mới'),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: idController,
-              decoration: const InputDecoration(labelText: 'Mã nhân viên', hintText: 'Nhập mã mới'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _userName = nameController.text;
-                _staffId = idController.text;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật hồ sơ thành công!')));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-            child: const Text('Lưu thay đổi'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'Mật khẩu cũ')),
-            SizedBox(height: 10),
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'Mật khẩu mới')),
-            SizedBox(height: 10),
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'Xác nhận mật khẩu')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đổi mật khẩu thành công!')));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-            child: const Text('Cập nhật'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showHelpCenter() {
     showModalBottomSheet(
@@ -155,14 +81,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.blue,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.flash_on, color: Colors.white, size: 18),
+              child: const Icon(Icons.water_drop, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 8),
             const Text(
-              'WaterFlow',
+              'WaterBill',
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
@@ -224,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionTitle('SECURITY'),
             _buildSettingsGroup([
               _buildSettingItem(
-                onTap: _showChangePasswordDialog,
+                onTap: () => Navigator.pushNamed(context, AppRoutes.changePassword),
                 icon: Icons.lock_outline,
                 title: 'Change Password',
                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -292,6 +218,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildProfileCard() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final userName = user?.fullName ?? 'Chưa cập nhật';
+    final staffId = user?.username ?? 'Chưa cập nhật';
+
     return Container(
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20),
@@ -311,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Align(
             alignment: Alignment.topRight,
             child: InkWell(
-              onTap: _showEditProfileDialog,
+              onTap: () => Navigator.pushNamed(context, AppRoutes.editProfile),
               child: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[600]),
             ),
           ),
@@ -320,9 +251,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Stack(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 40,
-                      backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=a'),
+                      backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=random'),
                     ),
                     Positioned(
                       right: 2,
@@ -340,7 +271,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _userName,
+                      userName,
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(width: 8),
@@ -356,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Staff ID: $_staffId',
+                  'Staff ID: $staffId',
                   style: TextStyle(color: Colors.grey[500], fontSize: 13),
                 ),
               ],

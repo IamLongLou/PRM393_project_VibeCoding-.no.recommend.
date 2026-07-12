@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/customer.dart';
 import '../../models/bill.dart';
 import '../../services/billing_service.dart';
-import '../../services/customer_service.dart';
 import '../../services/database_helper.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/customer_provider.dart';
+import 'receipt_screen.dart';
 
 /// Màn hình Xác nhận và Tổng hợp Hóa đơn (Nghiệp vụ phức tạp & Chuyển dữ liệu)
 class CollectionSummaryScreen extends StatelessWidget {
@@ -23,7 +26,7 @@ class CollectionSummaryScreen extends StatelessWidget {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Xác nhận thu tiền"),
+        title: const Text("Tạo hóa đơn"),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -31,7 +34,7 @@ class CollectionSummaryScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildCollectorInfo(),
+            _buildCollectorInfo(context),
             const SizedBox(height: 20),
             _buildCustomerSection(),
             const SizedBox(height: 20),
@@ -46,19 +49,20 @@ class CollectionSummaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCollectorInfo() {
+  Widget _buildCollectorInfo(BuildContext context) {
+    final userName = context.read<AuthProvider>().user?.fullName ?? 'Nhân viên';
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.blue[50],
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.badge, color: Colors.blue),
-          SizedBox(width: 10),
-          Text("Nhân viên thu: ", style: TextStyle(fontWeight: FontWeight.bold)),
-          Text("Nguyễn Văn A"),
+          const Icon(Icons.badge, color: Colors.blue),
+          const SizedBox(width: 10),
+          const Text("Nhân viên thu: ", style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(userName),
         ],
       ),
     );
@@ -149,29 +153,40 @@ class CollectionSummaryScreen extends StatelessWidget {
         Expanded(
           child: ElevatedButton(
             onPressed: () async {
-              // Lưu hóa đơn vào SQLite (Tính năng Offline)
+              // Lưu hóa đơn vào SQLite (Tính năng Offline), isPaid=false vì KH chưa trả tiền
               final db = await DatabaseHelper.instance.database;
-              await db.insert('bills', bill.toMap());
+              final billMap = {...bill.toMap(), 'isPaid': 0};
+              final newId = await db.insert('bills', billMap);
 
-              // Cập nhật trạng thái khách hàng
-              await CustomerService.updateStatus(customer.id!, CollectionStatus.completed);
+              // Trạng thái "đã ghi số" được tính tự động từ danh sách hóa đơn tháng hiện tại
+              // (CustomerProvider.recordedCustomerCodes) — không cần cập nhật status thủ công nữa.
               
+              // Reload danh sách KH trong Provider để UI cập nhật ngay lập tức
               if (context.mounted) {
-                Navigator.popUntil(context, ModalRoute.withName('/home'));
+                await context.read<CustomerProvider>().fetchLocal();
+              }
+
+              final savedBill = bill.copyWith(id: newId, isPaid: false);
+
+              if (context.mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => ReceiptScreen(customer: customer, bill: savedBill)),
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Lưu hóa đơn offline thành công! Hãy đồng bộ khi có mạng."),
-                    backgroundColor: Color(0xFF48CFAD),
+                    content: Text("Tạo hóa đơn thành công! Chờ khách hàng thanh toán."),
+                    backgroundColor: Color(0xFF2196F3),
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
-            child: const Text("XÁC NHẬN THU TIỀN"),
+            child: const Text("TẠO HÓA ĐƠN"),
           ),
         ),
       ],

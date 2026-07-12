@@ -146,14 +146,25 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 ),
                 const SizedBox(height: 50),
                 const Text(
-                  'LONG LOU\nWATER PAYMENT BLING BLING',
+                  'WATERBILL',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: 2,
+                    letterSpacing: 3,
                     shadows: [Shadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 2))],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Hệ thống quản lý thu tiền nước',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1,
                   ),
                 ),
                 const Spacer(),

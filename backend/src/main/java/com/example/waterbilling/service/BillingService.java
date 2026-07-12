@@ -7,6 +7,7 @@ import com.example.waterbilling.entity.Bill;
 import com.example.waterbilling.entity.CollectionStatus;
 import com.example.waterbilling.entity.Customer;
 import com.example.waterbilling.repository.BillRepository;
+import com.example.waterbilling.repository.TariffTierRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,15 +19,14 @@ import java.util.List;
 
 @Service
 public class BillingService {
-    private static final BigDecimal UNIT_PRICE = BigDecimal.valueOf(12000);
-    private static final BigDecimal VAT_RATE = BigDecimal.valueOf(0.10);
-
     private final BillRepository billRepository;
     private final CustomerService customerService;
+    private final TariffTierRepository tariffTierRepository;
 
-    public BillingService(BillRepository billRepository, CustomerService customerService) {
+    public BillingService(BillRepository billRepository, CustomerService customerService, TariffTierRepository tariffTierRepository) {
         this.billRepository = billRepository;
         this.customerService = customerService;
+        this.tariffTierRepository = tariffTierRepository;
     }
 
     @Transactional(readOnly = true)
@@ -52,8 +52,15 @@ public class BillingService {
         }
 
         int consumption = request.newReading() - customer.getCurrentReading();
-        BigDecimal amount = UNIT_PRICE.multiply(BigDecimal.valueOf(consumption)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal vat = amount.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = calculateTieredAmount(consumption).setScale(2, RoundingMode.HALF_UP);
+        // Flutter gom VAT 5% + Phí BVMT 10% vào 1 trường (15% tổng)
+        BigDecimal baseAmount = total.divide(BigDecimal.valueOf(1.15), 2, RoundingMode.HALF_UP);
+        BigDecimal vatAndEnvFee = total.subtract(baseAmount).setScale(2, RoundingMode.HALF_UP);
+
+        // unitPrice = average price per m3 (for display only)
+        BigDecimal unitPrice = consumption > 0
+                ? baseAmount.divide(BigDecimal.valueOf(consumption), 2, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(12000).setScale(2, RoundingMode.HALF_UP);
 
         Bill bill = new Bill();
         bill.setCustomer(customer);
@@ -62,10 +69,10 @@ public class BillingService {
         bill.setOldReading(customer.getCurrentReading());
         bill.setNewReading(request.newReading());
         bill.setConsumption(BigDecimal.valueOf(consumption).setScale(2, RoundingMode.HALF_UP));
-        bill.setUnitPrice(UNIT_PRICE.setScale(2, RoundingMode.HALF_UP));
-        bill.setAmount(amount);
-        bill.setVat(vat);
-        bill.setTotalAmount(amount.add(vat).setScale(2, RoundingMode.HALF_UP));
+        bill.setUnitPrice(unitPrice);
+        bill.setAmount(baseAmount);
+        bill.setVat(vatAndEnvFee);
+        bill.setTotalAmount(total);
         bill.setImagePath(request.imagePath());
         bill.setSynced(false);
 
@@ -83,9 +90,35 @@ public class BillingService {
     @Transactional
     public BillDto markSynced(Long id) {
         Bill bill = billRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy hóa đơn id=" + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hóa đơn id=" + id));
         bill.setSynced(true);
         return BillDto.from(bill);
+    }
+
+    /**
+     * Tính tiền nước theo biểu giá lũy kế bậc thang.
+     * Khớp hoàn toàn với logic trong Flutter BillingService.calculateAmount().
+     * Bậc 1: 0-10 m³ x 5,973đ; Bậc 2: 11-20 m³ x 7,052đ;
+     * Bậc 3: 21-30 m³ x 8,669đ; Bậc 4: >30 m³ x 15,929đ.
+     * Cộng thêm 5% VAT + 10% Phí BVMT = 15% tổng.
+     */
+    private BigDecimal calculateTieredAmount(int consumption) {
+        if (consumption <= 0) return BigDecimal.ZERO;
+
+        // Giá bậc thang cố định (khớp với Flutter BillingService)
+        final double P1 = 5973, P2 = 7052, P3 = 8669, P4 = 15929;
+        double base;
+        if (consumption <= 10) {
+            base = consumption * P1;
+        } else if (consumption <= 20) {
+            base = 10 * P1 + (consumption - 10) * P2;
+        } else if (consumption <= 30) {
+            base = 10 * P1 + 10 * P2 + (consumption - 20) * P3;
+        } else {
+            base = 10 * P1 + 10 * P2 + 10 * P3 + (consumption - 30) * P4;
+        }
+        // 5% VAT + 10% BVMT = 15%
+        return BigDecimal.valueOf(base * 1.15);
     }
 
     private BillDto upsertSyncedBill(BillDto dto) {
@@ -104,6 +137,8 @@ public class BillingService {
         bill.setTotalAmount(dto.totalAmount());
         bill.setImagePath(dto.imagePath());
         bill.setSynced(true);
+        // Đồng bộ trạng thái thanh toán từ Flutter (mặc định false nếu null)
+        bill.setPaid(dto.isPaid() != null && dto.isPaid());
 
         if (dto.newReading() > customer.getCurrentReading()) {
             customer.setCurrentReading(dto.newReading());

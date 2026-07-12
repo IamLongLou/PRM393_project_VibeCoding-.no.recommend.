@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/customer.dart';
@@ -20,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -35,13 +36,13 @@ class DatabaseHelper {
         address TEXT NOT NULL,
         phone TEXT NOT NULL,
         currentReading INTEGER NOT NULL,
-        status INTEGER NOT NULL
+        status INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
     await db.execute('''
       CREATE TABLE bills (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         customerId INTEGER NOT NULL,
         customerName TEXT,
         customerCode TEXT,
@@ -55,7 +56,8 @@ class DatabaseHelper {
         vat REAL NOT NULL,
         totalAmount REAL NOT NULL,
         imagePath TEXT,
-        isSynced INTEGER NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0,
+        isPaid INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (customerId) REFERENCES customers (id) ON DELETE CASCADE
       )
     ''');
@@ -96,6 +98,9 @@ class DatabaseHelper {
     if (oldVersion < 3) {
       await _addColumnIfMissing(db, 'user_session', 'customerCode', 'TEXT');
     }
+    if (oldVersion < 4) {
+      await _addColumnIfMissing(db, 'bills', 'isPaid', 'INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future<void> _addColumnIfMissing(Database db, String table, String column, String type) async {
@@ -110,11 +115,10 @@ class DatabaseHelper {
   //   final customers = [
   //     Customer(id: 1, code: 'KH001', name: 'Lưu Bị', address: '12-A Phố Huế, Hai Bà Trưng, Hà Nội', phone: '0912345001', currentReading: 125),
   //     Customer(id: 2, code: 'KH002', name: 'Quan Vũ', address: '88 Đường Láng, Đống Đa, Hà Nội', phone: '0987654002', currentReading: 80),
-  //     Customer(id: 3, code: 'KH003', name: 'Trương Phi', address: '15/2 Trần Duy Hưng, Cầu Giấy, Hà Nội', phone: '0904444003', currentReading: 210, status: CollectionStatus.completed),
-  //     Customer(id: 4, code: 'KH004', name: 'Gia Cát Lượng', address: 'Lạch Tray, Ngô Quyền, Hải Phòng', phone: '0911222004', currentReading: 45, status: CollectionStatus.reading),
+  //     Customer(id: 3, code: 'KH003', name: 'Trương Phi', address: '15/2 Trần Duy Hưng, Cầu Giấy, Hà Nội', phone: '0904444003', currentReading: 210),
+  //     Customer(id: 4, code: 'KH004', name: 'Gia Cát Lượng', address: 'Lạch Tray, Ngô Quyền, Hải Phòng', phone: '0911222004', currentReading: 45),
   //     Customer(id: 5, code: 'KH005', name: 'Tào Tháo', address: 'Trần Hưng Đạo, TP. Bắc Ninh', phone: '0933555005', currentReading: 320),
   //   ];
-
   //   for (final customer in customers) {
   //     await db.insert('customers', customer.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
   //   }
@@ -126,16 +130,32 @@ class DatabaseHelper {
     return res.map(Customer.fromMap).toList();
   }
 
+  /// Upsert danh sách KH từ server.
+  /// Giữ lại chỉ số nước lớn nhất giữa local và server để tránh mất dữ liệu ghi mới.
   Future<void> upsertCustomers(List<Customer> customers) async {
     final db = await database;
-    final batch = db.batch();
-    for (var c in customers) batch.insert('customers', c.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-    await batch.commit(noResult: true);
+    for (var c in customers) {
+      final existing = await db.query('customers', where: 'id = ?', whereArgs: [c.id]);
+      if (existing.isNotEmpty) {
+        final localReading = existing.first['currentReading'] as int;
+        // Giữ lại chỉ số nước lớn nhất
+        final finalReading = localReading > c.currentReading ? localReading : c.currentReading;
+        await db.update(
+          'customers',
+          {...c.toMap(), 'currentReading': finalReading},
+          where: 'id = ?',
+          whereArgs: [c.id],
+        );
+      } else {
+        await db.insert('customers', c.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    }
   }
 
   Future<void> updateCustomerReading(int id, int newReading) async {
     final db = await database;
-    await db.update('customers', {'currentReading': newReading, 'status': 2}, where: 'id = ?', whereArgs: [id]);
+    final rows = await db.update('customers', {'currentReading': newReading}, where: 'id = ?', whereArgs: [id]);
+    debugPrint('SQLite updateCustomerReading: customerId=$id, newReading=$newReading, rowsAffected=$rows');
   }
 
   Future<void> insertBill(Bill bill) async {
@@ -146,6 +166,12 @@ class DatabaseHelper {
   Future<List<Bill>> getUnsyncedBills() async {
     final db = await database;
     final res = await db.query('bills', where: 'isSynced = ?', whereArgs: [0]);
+    return res.map(Bill.fromMap).toList();
+  }
+
+  Future<List<Bill>> getAllBills() async {
+    final db = await database;
+    final res = await db.query('bills', orderBy: 'date DESC');
     return res.map(Bill.fromMap).toList();
   }
 
@@ -160,5 +186,59 @@ class DatabaseHelper {
     final db = await database;
     final res = await db.query('bills', where: 'customerId = ?', whereArgs: [customerId], orderBy: 'date DESC');
     return res.map(Bill.fromMap).toList();
+  }
+
+  Future<void> markBillAsPaid(int billId) async {
+    final db = await database;
+    // Set isPaid = 1 và đồng thời reset isSynced = 0 để gửi bản cập nhật thanh toán này lên SQL Server
+    await db.update('bills', {'isPaid': 1, 'isSynced': 0}, where: 'id = ?', whereArgs: [billId]);
+  }
+
+  Future<void> markAllBillsAsPaidForCustomer(int customerId) async {
+    final db = await database;
+    // Cập nhật toàn bộ các hóa đơn chưa thanh toán của KH này thành đã thanh toán và đánh dấu chưa sync
+    await db.update(
+      'bills',
+      {'isPaid': 1, 'isSynced': 0},
+      where: 'customerId = ? AND isPaid = ?',
+      whereArgs: [customerId, 0],
+    );
+  }
+
+  Future<Customer?> getCustomerById(int id) async {
+    final db = await database;
+    final res = await db.query('customers', where: 'id = ?', whereArgs: [id]);
+    if (res.isEmpty) return null;
+    return Customer.fromMap(res.first);
+  }
+
+  Future<void> updateCustomer(Customer customer) async {
+    final db = await database;
+    await db.update('customers', customer.toMap(), where: 'id = ?', whereArgs: [customer.id]);
+  }
+
+  Future<void> saveSession(User user, String? token) async {
+    final db = await database;
+    await db.insert(
+      'user_session',
+      {
+        ...user.toMap(),
+        'token': token,
+        'lastLoginAt': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<User?> getLastSession() async {
+    final db = await database;
+    final res = await db.query('user_session', orderBy: 'lastLoginAt DESC', limit: 1);
+    if (res.isEmpty) return null;
+    return User.fromMap(res.first);
+  }
+
+  Future<void> clearSession() async {
+    final db = await database;
+    await db.delete('user_session');
   }
 }

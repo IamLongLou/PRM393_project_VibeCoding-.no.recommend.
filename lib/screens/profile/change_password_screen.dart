@@ -109,7 +109,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               onPressed: () => setState(() => _obscureText = !_obscureText),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+            fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
           validator: (value) {

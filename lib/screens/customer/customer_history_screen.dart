@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../../models/customer.dart';
 import '../../models/bill.dart';
 import '../../providers/billing_provider.dart';
+import '../../providers/customer_provider.dart';
+import '../../providers/sync_provider.dart';
+import '../../services/database_helper.dart';
 import '../../routes/app_routes.dart';
 import 'package:intl/intl.dart';
 
@@ -28,29 +31,40 @@ class _CustomerHistoryScreenState extends State<CustomerHistoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(title: const Text('Lịch sử hóa đơn')),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildCustomerHeader(),
-            _buildQuickStats(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time, size: 16, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  const Text('Danh sách kỳ thanh toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const Spacer(),
-                  Consumer<BillingProvider>(
-                    builder: (context, provider, _) => Text('${provider.customerBills.length} bản ghi', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+      body: Consumer<BillingProvider>(
+        builder: (context, billingProvider, _) {
+          final List<Bill> bills = billingProvider.customerBills;
+          final now = DateTime.now();
+
+          // Hóa đơn nợ của các tháng cũ (chưa thanh toán, không thuộc tháng hiện tại)
+          final unpaidOldBills = bills.where((b) {
+            final isCurrentMonth = b.date.month == now.month && b.date.year == now.year;
+            return !b.isPaid && !isCurrentMonth;
+          }).toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildCustomerHeader(),
+                _buildQuickStats(bills, currencyFormat),
+
+                // Banner thu toàn bộ nợ cũ (chỉ hiện khi có nợ)
+                if (unpaidOldBills.isNotEmpty)
+                  _buildCollectAllDebtBanner(context, unpaidOldBills, currencyFormat),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      const Text('Danh sách kỳ thanh toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Spacer(),
+                      Text('${bills.length} bản ghi', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            Consumer<BillingProvider>(
-              builder: (context, provider, child) {
-                final List<Bill> bills = provider.customerBills;
-                return ListView.builder(
+                ),
+                ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -59,14 +73,14 @@ class _CustomerHistoryScreenState extends State<CustomerHistoryScreen> {
                     final bill = bills[index];
                     return _buildBillCard(bill, currencyFormat);
                   },
-                );
-              },
+                ),
+                const SizedBox(height: 20),
+                _buildInfoNote(),
+                const SizedBox(height: 50),
+              ],
             ),
-            const SizedBox(height: 20),
-            _buildInfoNote(),
-            const SizedBox(height: 50),
-          ],
-        ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -101,14 +115,105 @@ class _CustomerHistoryScreenState extends State<CustomerHistoryScreen> {
     );
   }
 
-  Widget _buildQuickStats() {
+  Widget _buildQuickStats(List<Bill> bills, NumberFormat format) {
+    final totalDebt = bills
+        .where((b) => !b.isPaid)
+        .fold<double>(0.0, (sum, b) => sum + b.totalAmount);
+    final avgConsumption = bills.isEmpty
+        ? 0.0
+        : bills.map((b) => b.consumption).reduce((a, b) => a + b) / bills.length;
+    final debtColor = totalDebt > 0 ? Colors.red : Colors.green;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _statBox('Trung bình', '15.2 m³', Colors.green),
+          _statBox('Trung bình', '${avgConsumption.toStringAsFixed(1)} m³', Colors.blue),
           const SizedBox(width: 15),
-          _statBox('Tổng nợ', '0đ', Colors.blue),
+          _statBox('Tổng nợ', totalDebt > 0 ? format.format(totalDebt) : 'Không nợ', debtColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectAllDebtBanner(BuildContext context, List<Bill> unpaidOldBills, NumberFormat format) {
+    final totalDebt = unpaidOldBills.fold<double>(0.0, (sum, b) => sum + b.totalAmount);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF5252), Color(0xFFFF1744)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.red.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Còn ${unpaidOldBills.length} kỳ chưa thanh toán',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              Text(
+                format.format(totalDebt),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                // Thu toàn bộ nợ cũ: đánh dấu tất cả hóa đơn nợ là đã thanh toán
+                final customerProvider = Provider.of<CustomerProvider>(context, listen: false);
+                final syncProvider = Provider.of<SyncProvider>(context, listen: false);
+                final billingProvider = Provider.of<BillingProvider>(context, listen: false);
+
+                for (final bill in unpaidOldBills) {
+                  await DatabaseHelper.instance.markBillAsPaid(bill.id!);
+                }
+
+                // fetchLocal() luôn thành công (không phụ thuộc API),
+                // luôn tăng refreshKey → CustomerCard tự reload data từ SQLite
+                await billingProvider.fetchBillsByCustomer(widget.customer.id ?? 1);
+                await syncProvider.fetchUnsyncedBills();
+                await customerProvider.fetchLocal();
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Đã thu ${unpaidOldBills.length} kỳ nợ cũ (${format.format(totalDebt)})'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.payments_outlined, size: 18, color: Color(0xFFFF1744)),
+              label: const Text(
+                'THU TOÀN BỘ NỢ CŨ',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF1744), fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                elevation: 0,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -150,7 +255,24 @@ class _CustomerHistoryScreenState extends State<CustomerHistoryScreen> {
                     ],
                   ),
                 ),
-                Text(bill.isSynced ? 'Đã đồng bộ' : 'Chưa đồng bộ', style: TextStyle(color: bill.isSynced ? Colors.green : Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: bill.isPaid ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        bill.isPaid ? 'Đã TT' : 'Chưa TT',
+                        style: TextStyle(color: bill.isPaid ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(bill.isSynced ? 'Đã sync' : 'Chưa sync', style: TextStyle(color: bill.isSynced ? Colors.blue : Colors.grey, fontSize: 9)),
+                  ],
+                ),
                 const SizedBox(width: 4),
                 const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
               ],
@@ -219,7 +341,7 @@ class _CustomerHistoryScreenState extends State<CustomerHistoryScreen> {
       child: const Row(
         children: [
           Icon(Icons.info_outline, size: 16, color: Colors.grey),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(child: Text('Dữ liệu hiển thị dựa trên lịch sử đã ghi nhận trên thiết bị.', style: TextStyle(fontSize: 10, color: Colors.grey))),
         ],
       ),

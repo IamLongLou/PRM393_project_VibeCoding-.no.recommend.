@@ -50,7 +50,7 @@ class NotificationScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(15),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +58,7 @@ class NotificationScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: _getIconColor(item['type']!).withOpacity(0.1),
+                    color: _getIconColor(item['type']!).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(_getIcon(item['type']!), color: _getIconColor(item['type']!), size: 20),

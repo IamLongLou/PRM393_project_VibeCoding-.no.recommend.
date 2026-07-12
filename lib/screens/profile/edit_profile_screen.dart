@@ -120,7 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: const Color(0xFF48CFAD)),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+            fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
           validator: (value) => value == null || value.isEmpty ? 'Vui lòng không để trống' : null,

@@ -1,5 +1,3 @@
-enum CollectionStatus { pending, reading, completed }
-
 class Customer {
   final int? id;
   final String code;
@@ -7,12 +5,11 @@ class Customer {
   final String address;
   final String phone;
   final int currentReading;
-  final CollectionStatus status;
 
-  Customer({this.id, required this.code, required this.name, required this.address, required this.phone, required this.currentReading, this.status = CollectionStatus.pending});
+  Customer({this.id, required this.code, required this.name, required this.address, required this.phone, required this.currentReading});
 
   Map<String, dynamic> toMap() => {
-    'id': id, 'code': code, 'name': name, 'address': address, 'phone': phone, 'currentReading': currentReading, 'status': status.index,
+    'id': id, 'code': code, 'name': name, 'address': address, 'phone': phone, 'currentReading': currentReading,
   };
 
   factory Customer.fromMap(Map<String, dynamic> map) => Customer(
@@ -22,10 +19,9 @@ class Customer {
     address: map['address'] ?? '',
     phone: map['phone'] ?? '',
     currentReading: map['currentReading'] ?? 0,
-    status: CollectionStatus.values[map['status'] ?? 0],
   );
 
-  Customer copyWith({int? id, String? code, String? name, String? address, String? phone, int? currentReading, CollectionStatus? status}) {
+  Customer copyWith({int? id, String? code, String? name, String? address, String? phone, int? currentReading}) {
     return Customer(
       id: id ?? this.id,
       code: code ?? this.code,
@@ -33,7 +29,6 @@ class Customer {
       address: address ?? this.address,
       phone: phone ?? this.phone,
       currentReading: currentReading ?? this.currentReading,
-      status: status ?? this.status,
     );
   }
 }

@@ -58,6 +58,7 @@ CREATE TABLE dbo.bills (
     total_amount DECIMAL(18,2) NOT NULL,
     image_path NVARCHAR(1000) NULL,
     is_synced BIT NOT NULL CONSTRAINT df_bills_is_synced DEFAULT 0,
+    is_paid BIT NOT NULL CONSTRAINT df_bills_is_paid DEFAULT 0,
     created_at DATETIME2 NOT NULL CONSTRAINT df_bills_created_at DEFAULT SYSUTCDATETIME(),
     updated_at DATETIME2 NULL,
     CONSTRAINT fk_bills_customers FOREIGN KEY (customer_id) REFERENCES dbo.customers(id) ON DELETE CASCADE,

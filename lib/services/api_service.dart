@@ -12,7 +12,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>?> login(String u, String p) async {
     try {
-      print('Calling Login: $baseUrl/auth/login');
+      debugPrint('Calling Login: $baseUrl/auth/login');
       final res = await http.post(
         Uri.parse('$baseUrl/auth/login'), 
         headers: {
@@ -21,26 +21,26 @@ class ApiService {
         }, 
         body: jsonEncode({'username': u, 'password': p})
       );
-      print('Login Status: ${res.statusCode}');
+      debugPrint('Login Status: ${res.statusCode}');
       if (res.statusCode == 200) return jsonDecode(utf8.decode(res.bodyBytes));
     } catch (e) {
-      print('Login error: $e');
+      debugPrint('Login error: $e');
     }
     return null;
   }
 
   static Future<Map<String, dynamic>?> bootstrap() async {
     try {
-      print('Calling Bootstrap: $baseUrl/bootstrap');
+      debugPrint('Calling Bootstrap: $baseUrl/bootstrap');
       final res = await http.get(Uri.parse('$baseUrl/bootstrap'));
-      print('Bootstrap Status: ${res.statusCode}');
+      debugPrint('Bootstrap Status: ${res.statusCode}');
       if (res.statusCode == 200) {
         final data = jsonDecode(utf8.decode(res.bodyBytes));
-        print('Data received: ${data['customers']?.length} customers');
+        debugPrint('Data received: ${data['customers']?.length} customers');
         return data;
       }
     } catch (e) {
-      print('Bootstrap error: $e');
+      debugPrint('Bootstrap error: $e');
     }
     return null;
   }
@@ -54,7 +54,7 @@ class ApiService {
       );
       return res.statusCode == 200;
     } catch (e) {
-      print('Sync error: $e');
+      debugPrint('Sync error: $e');
     }
     return false;
   }

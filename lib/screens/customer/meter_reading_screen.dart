@@ -119,7 +119,7 @@ class _MeterReadingScreenState extends State<MeterReadingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.customer.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
-                Text('# PE120005678', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey, fontSize: 11)),
+                Text('# ${widget.customer.code}', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey, fontSize: 11)),
               ],
             ),
           ),
@@ -142,8 +142,8 @@ class _MeterReadingScreenState extends State<MeterReadingScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: isOld 
-                  ? (isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]) 
-                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.white),
+                  ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100]) 
+                  : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white),
               borderRadius: BorderRadius.circular(15),
               border: Border.all(color: isOld ? Colors.transparent : Colors.blue, width: 2),
             ),
@@ -192,7 +192,7 @@ class _MeterReadingScreenState extends State<MeterReadingScreen> {
           height: 55,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.white, 
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white, 
             borderRadius: BorderRadius.circular(12), 
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5)]
           ),

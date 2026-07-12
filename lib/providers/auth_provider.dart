@@ -40,14 +40,14 @@ class AuthProvider with ChangeNotifier {
       );
       
       // Lưu session vào SQLite để dùng offline
-      await _dbHelper.saveSession(_user!, token);
+      await _db.saveSession(_user!, token);
       
       _isLoading = false;
       notifyListeners();
       return true;
     } else {
       final last = await _db.getLastSession();
-      if (last != null && last.username == u) {
+      if (last != null && last.username == username) {
         _user = last; 
         _isLoading = false; 
         notifyListeners();
@@ -58,8 +58,8 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     return false;
     } catch (e, s) {
-    print("LOGIN ERROR: $e");
-    print(s);
+    debugPrint("LOGIN ERROR: $e");
+    debugPrint(s.toString());
     return false;
   } finally {
     _isLoading = false;

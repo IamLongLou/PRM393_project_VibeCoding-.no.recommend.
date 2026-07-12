@@ -10,7 +10,7 @@ import '../screens/settings/settings_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/edit_profile_screen.dart';
 import '../screens/profile/change_password_screen.dart';
-import '../screens/notifications/notification_screen.dart';
+
 
 class AppRoutes {
   static const String splash = '/';
@@ -24,7 +24,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
   static const String changePassword = '/change-password';
-  static const String notifications = '/notifications';
+
 
   static Map<String, WidgetBuilder> get routes => {
     splash: (context) => const SplashScreen(),
@@ -41,6 +41,6 @@ class AppRoutes {
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
     changePassword: (context) => const ChangePasswordScreen(),
-    notifications: (context) => const NotificationScreen(),
+
   };
 }

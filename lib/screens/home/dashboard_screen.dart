@@ -1,37 +1,23 @@
 import 'package:flutter/material.dart';
-import '../../services/customer_service.dart';
-import '../../models/customer.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/customer_provider.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   final Function(int) onNavigate;
   const DashboardScreen({super.key, required this.onNavigate});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  int pendingTasks = 0;
-  int completedTasks = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStats();
-  }
-
-  Future<void> _loadStats() async {
-    final all = await CustomerService.getCustomers();
-    if (mounted) {
-      setState(() {
-        completedTasks = all.where((c) => c.status == CollectionStatus.completed).length;
-        pendingTasks = all.length - completedTasks;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final userName = user?.fullName ?? 'Nhân viên';
+    final userRole = (user?.role == 'STAFF' ? 'Nhân viên thu tiền' : 'Khách hàng');
+
+    final customerProvider = context.watch<CustomerProvider>();
+    final all = customerProvider.allCustomers;
+    final completedTasks = all.where((c) => customerProvider.recordedCustomerCodes.contains(c.code)).length;
+    final pendingTasks = all.isEmpty && customerProvider.isLoading ? 0 : all.length - completedTasks;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -52,8 +38,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Nhân viên thu tiền", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                      const Text("Nguyễn Văn A", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(userRole, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     ],
                   ),
                 ],
@@ -76,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text("Chế độ ngoại tuyến", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          Text("Có $pendingTasks công việc chưa hoàn thành", style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                          Text("Có $pendingTasks công việc chưa hoàn thành", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
                         ],
                       ),
                     ),
@@ -96,10 +82,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 mainAxisSpacing: 15,
                 crossAxisSpacing: 15,
                 children: [
-                  _menuItem(Icons.people_alt_rounded, "Khách hàng", const Color(0xFF48CFAD), () => widget.onNavigate(0)),
+                  _menuItem(Icons.people_alt_rounded, "Khách hàng", const Color(0xFF48CFAD), () => onNavigate(0)),
                   _menuItem(Icons.sync_rounded, "Đồng bộ", const Color(0xFFAC92EC), () => Navigator.pushNamed(context, "/sync")),
-                  _menuItem(Icons.pie_chart_rounded, "Thống kê", const Color(0xFF5D9CEC), () => widget.onNavigate(1)),
-                  _menuItem(Icons.account_circle_rounded, "Hồ sơ", const Color(0xFFFC6E51), () => widget.onNavigate(2)),
+                  _menuItem(Icons.pie_chart_rounded, "Thống kê", const Color(0xFF5D9CEC), () => onNavigate(1)),
+                  _menuItem(Icons.account_circle_rounded, "Hồ sơ", const Color(0xFFFC6E51), () => onNavigate(2)),
                 ],
               ),
             ],
@@ -116,14 +102,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 30),
             ),
             const SizedBox(height: 12),

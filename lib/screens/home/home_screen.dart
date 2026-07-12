@@ -122,7 +122,6 @@ class HomeScreen extends StatelessWidget {
                     Text('Hôm nay: $formattedDate', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                     const SizedBox(height: 20),
                     if (user?.role != 'user') _buildReadyBanner(context),
-                    if (user?.role != 'user') _buildReadyBanner(context),
                     const SizedBox(height: 20),
                     if (user?.role == 'staff') _buildStaffStats(context),
                     if (user?.role == 'user') _buildUserHeader(context, user),
@@ -177,16 +176,6 @@ class HomeScreen extends StatelessWidget {
           ),
           const Spacer(),
           InkWell(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
-            child: const Stack(
-              children: [
-                Icon(Icons.notifications_none, size: 28),
-                Positioned(right: 0, top: 0, child: CircleAvatar(radius: 5, backgroundColor: Colors.red)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 15),
-          InkWell(
             onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
             child: CircleAvatar(
               radius: 18,
@@ -202,8 +191,8 @@ class HomeScreen extends StatelessWidget {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
         final List<Customer> customers = provider.allCustomers;
-        final pendingCount = customers.where((c) => c.status != CollectionStatus.completed).length;
-        final completedCount = customers.where((c) => c.status == CollectionStatus.completed).length;
+        final pendingCount = customers.where((c) => !provider.recordedCustomerCodes.contains(c.code)).length;
+        final completedCount = customers.where((c) => provider.recordedCustomerCodes.contains(c.code)).length;
         
         return Row(
           children: [
@@ -339,14 +328,18 @@ class HomeScreen extends StatelessWidget {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
         final List<Customer> customers = provider.allCustomers;
-        final pendingCount = customers.where((c) => c.status != CollectionStatus.completed).length;
+        final pendingCount = customers.where((c) => !provider.recordedCustomerCodes.contains(c.code)).length;
+        
+        // Đọc SyncProvider để đếm số lượng hóa đơn chưa đồng bộ
+        final syncProvider = Provider.of<SyncProvider>(context);
+        final unsyncedCount = syncProvider.unsyncedBills.length;
         
         List<Widget> cards = [];
         
         if (role == 'staff') {
           cards = [
             _funcCard(context, 'Khách hàng', 'Danh sách hộ dân & ghi chỉ số nước', Icons.people_outline, Colors.blue, AppRoutes.customerList, hasBadge: true, badgeValue: '$pendingCount'),
-            _funcCard(context, 'Đồng bộ', 'Tải lên kết quả & cập nhật dữ liệu', Icons.sync, Colors.green, AppRoutes.sync),
+            _funcCard(context, 'Đồng bộ', 'Tải lên kết quả & cập nhật dữ liệu', Icons.sync, Colors.green, AppRoutes.sync, hasBadge: unsyncedCount > 0, badgeValue: '$unsyncedCount'),
             _funcCard(context, 'Thống kê', 'Báo cáo sản lượng & hiệu suất thu', Icons.bar_chart, Colors.purple, AppRoutes.statistics),
             _funcCard(context, 'Lịch sử', 'Nhật ký hoạt động & biên lai đã xuất', Icons.history, Colors.grey, AppRoutes.history),
           ];

@@ -37,7 +37,9 @@ public record BillDto(
         @Schema(description = "Đường dẫn ảnh đồng hồ nước nếu app có upload/lưu ảnh.", example = "/images/meter-1.jpg")
         String imagePath,
         @Schema(description = "true nếu hóa đơn đã đồng bộ lên server, false nếu còn pending.", example = "false")
-        Boolean isSynced
+        Boolean isSynced,
+        @Schema(description = "true nếu khách hàng đã thanh toán hóa đơn này.", example = "false")
+        Boolean isPaid
 ) {
     public static BillDto from(Bill bill) {
         return new BillDto(
@@ -55,7 +57,8 @@ public record BillDto(
                 bill.getVat(),
                 bill.getTotalAmount(),
                 bill.getImagePath(),
-                bill.getSynced()
+                bill.getSynced(),
+                bill.getPaid()
         );
     }
 }
