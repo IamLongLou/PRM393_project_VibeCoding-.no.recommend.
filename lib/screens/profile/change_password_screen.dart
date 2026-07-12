@@ -34,12 +34,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đổi mật khẩu thành công!')),
+            const SnackBar(
+              content: Text('✅ Đổi mật khẩu thành công!'),
+              backgroundColor: Colors.green,
+            ),
           );
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Có lỗi xảy ra.')),
+            const SnackBar(
+              content: Text('❌ Sai mật khẩu hiện tại hoặc không thể kết nối. Vui lòng thử lại.'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }

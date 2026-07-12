@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
-import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/sync_provider.dart';
+import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,62 +13,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _autoSync = true;
-  bool _biometric = false;
-
-  void _showHelpCenter() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        minChildSize: 0.4,
-        expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
-              const SizedBox(height: 20),
-              const Text('Trung tâm hỗ trợ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: [
-                    _buildHelpItem(Icons.question_answer_outlined, 'Hướng dẫn sử dụng máy in Bluetooth'),
-                    _buildHelpItem(Icons.sync_problem, 'Lỗi không đồng bộ được dữ liệu'),
-                    _buildHelpItem(Icons.history_edu, 'Cách tra cứu lịch sử thu tiền'),
-                    _buildHelpItem(Icons.phone_in_talk_outlined, 'Gọi hotline kỹ thuật: 1900 1234'),
-                    const Divider(height: 40),
-                    const Text('Các câu hỏi thường gặp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 10),
-                    const Text('1. Tôi phải làm gì nếu app bị treo khi đang thu tiền?'),
-                    const Text('Hãy thử xóa bộ nhớ đệm trong phần cài đặt hoặc khởi động lại ứng dụng.', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHelpItem(IconData icon, String title) => ListTile(
-    leading: Icon(icon, color: Colors.blue),
-    title: Text(title, style: const TextStyle(fontSize: 14)),
-    trailing: const Icon(Icons.chevron_right, size: 18),
-    onTap: () {},
-  );
-
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    final user = Provider.of<AuthProvider>(context).user;
+    final bool isUser = user?.role == 'user';
+    final syncProvider = Provider.of<SyncProvider>(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -104,81 +54,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _buildProfileCard(),
             const SizedBox(height: 10),
-            _buildSectionTitle('DEVICE & DATA'),
-            _buildSettingsGroup([
-              _buildSettingItem(
-                icon: Icons.brightness_4_outlined,
-                title: 'Dark Mode',
-                trailing: Switch(
-                  value: isDark,
-                  onChanged: (v) => themeProvider.toggleTheme(v),
-                  activeThumbColor: Colors.blue,
+            if (!isUser) ...[
+              _buildSectionTitle('ĐỒNG BỘ DỮ LIỆU'),
+              _buildSettingsGroup([
+                _buildSettingItem(
+                  icon: Icons.sync,
+                  title: 'Trạng thái đồng bộ',
+                  subtitle: syncProvider.lastSyncTime != null
+                      ? 'Lần cuối: ${DateFormat('dd/MM/yyyy HH:mm').format(syncProvider.lastSyncTime!.toLocal())}'
+                      : 'Chưa đồng bộ lần nào',
+                  trailing: syncProvider.isSyncing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : syncProvider.unsyncedBills.isEmpty
+                          ? const Icon(Icons.check_circle, color: Colors.green, size: 22)
+                          : Badge(
+                              label: Text('${syncProvider.unsyncedBills.length}'),
+                              child: const Icon(Icons.sync_problem, color: Colors.orange, size: 22),
+                            ),
                 ),
-              ),
-              const Divider(height: 1, indent: 60),
-              _buildSettingItem(
-                icon: Icons.print_outlined,
-                title: 'Thermal Printer',
-                trailing: const Text(
-                  'Disconnected',
-                  style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-              ),
-              const Divider(height: 1, indent: 60),
-              _buildSettingItem(
-                icon: Icons.sync,
-                title: 'Auto-Sync',
-                trailing: Switch(
-                  value: _autoSync,
-                  onChanged: (v) => setState(() => _autoSync = v),
-                  activeThumbColor: Colors.blue,
-                ),
-              ),
-              const Divider(height: 1, indent: 60),
-              _buildSettingItem(
-                icon: Icons.delete_outline,
-                title: 'Clear Cache',
-                subtitle: 'Current usage: 24.5 MB',
-                trailing: TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa bộ nhớ đệm!')));
-                  },
-                  child: const Text('CLEAR', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ]),
-            _buildSectionTitle('SECURITY'),
+                if (syncProvider.lastError != null) ...[
+                  const Divider(height: 1, indent: 60),
+                  _buildSettingItem(
+                    icon: Icons.error_outline,
+                    title: 'Lỗi đồng bộ',
+                    subtitle: syncProvider.lastError,
+                    trailing: const SizedBox.shrink(),
+                  ),
+                ],
+              ]),
+            ],
+            _buildSectionTitle('BẢO MẬT'),
             _buildSettingsGroup([
               _buildSettingItem(
                 onTap: () => Navigator.pushNamed(context, AppRoutes.changePassword),
                 icon: Icons.lock_outline,
-                title: 'Change Password',
+                title: 'Đổi mật khẩu',
                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
               ),
-              const Divider(height: 1, indent: 60),
-              _buildSettingItem(
-                icon: Icons.fingerprint,
-                title: 'Biometric Login',
-                trailing: Switch(
-                  value: _biometric,
-                  onChanged: (v) => setState(() => _biometric = v),
-                  activeThumbColor: Colors.blue,
-                ),
-              ),
             ]),
-            _buildSectionTitle('SUPPORT'),
+            _buildSectionTitle('VỀ ỨNG DỤNG'),
             _buildSettingsGroup([
               _buildSettingItem(
                 icon: Icons.info_outline,
-                title: 'App Version',
+                title: 'Phiên bản ứng dụng',
                 trailing: const Text('v2.4.0', style: TextStyle(color: Colors.grey, fontSize: 14)),
-              ),
-              const Divider(height: 1, indent: 60),
-              _buildSettingItem(
-                onTap: _showHelpCenter,
-                icon: Icons.help_outline,
-                title: 'Help Center',
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
               ),
             ]),
             const SizedBox(height: 30),
@@ -187,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false),
                 icon: const Icon(Icons.logout, color: Colors.red),
                 label: const Text(
-                  'Logout',
+                  'Đăng xuất',
                   style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
@@ -198,21 +121,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: 3, // Cài đặt
+        currentIndex: isUser ? 2 : 3, // Cài đặt
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
         onTap: (index) {
-          if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
-          if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.customerList);
-          if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.history);
-          if (index == 3) return;
+          if (isUser) {
+            if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
+            if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.history);
+            if (index == 2) return;
+          } else {
+            if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
+            if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.customerList);
+            if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.history);
+            if (index == 3) return;
+          }
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Khách hàng'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
-        ],
+        items: isUser
+            ? const [
+                BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+                BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+                BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
+              ]
+            : const [
+                BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+                BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Khách hàng'),
+                BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+                BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
+              ],
       ),
     );
   }
@@ -251,9 +186,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=random'),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Colors.blue.shade400, Colors.blue.shade700],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          userName.isNotEmpty ? userName.trim()[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                     Positioned(
                       right: 2,

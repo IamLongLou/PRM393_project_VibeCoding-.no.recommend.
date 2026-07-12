@@ -1,12 +1,16 @@
 package com.example.waterbilling.controller;
 
+import com.example.waterbilling.dto.ChangePasswordRequest;
 import com.example.waterbilling.dto.LoginRequest;
 import com.example.waterbilling.dto.LoginResponse;
+import com.example.waterbilling.dto.UpdateProfileRequest;
+import com.example.waterbilling.dto.UserDto;
 import com.example.waterbilling.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,5 +41,34 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @Operation(
+            summary = "Đổi mật khẩu",
+            description = """
+                    Đổi mật khẩu cho người dùng. Yêu cầu cung cấp username, mật khẩu hiện tại và mật khẩu mới.
+                    Trả về 200 nếu thành công, 400 nếu sai mật khẩu hiện tại.
+                    """
+    )
+    @ApiResponse(responseCode = "200", description = "Đổi mật khẩu thành công.")
+    @ApiResponse(responseCode = "400", description = "Sai mật khẩu hiện tại hoặc dữ liệu không hợp lệ.")
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(
+            summary = "Cập nhật thông tin cá nhân",
+            description = """
+                    Cập nhật họ tên, email, số điện thoại của người dùng.
+                    Trả về thông tin người dùng mới sau khi cập nhật.
+                    """
+    )
+    @ApiResponse(responseCode = "200", description = "Cập nhật thành công.")
+    @ApiResponse(responseCode = "400", description = "Không tìm thấy người dùng hoặc dữ liệu không hợp lệ.")
+    @PostMapping("/update-profile")
+    public UserDto updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return authService.updateProfile(request);
     }
 }

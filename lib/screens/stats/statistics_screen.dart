@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/customer_provider.dart';
 import '../../providers/billing_provider.dart';
 import '../../routes/app_routes.dart';
@@ -23,9 +24,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     super.initState();
     // Khởi tạo chọn khách hàng đầu tiên sau khi build xong
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = Provider.of<AuthProvider>(context, listen: false).user;
       final List<Customer> customers = Provider.of<CustomerProvider>(context, listen: false).allCustomers;
-      if (customers.isNotEmpty) {
-        setState(() => _selectedCustomerId = customers.first.id);
+      if (user?.role == 'user') {
+        try {
+          final matchingCustomer = customers.firstWhere((c) => c.code == user?.customerCode);
+          setState(() => _selectedCustomerId = matchingCustomer.id);
+        } catch (_) {
+          if (customers.isNotEmpty) {
+            setState(() => _selectedCustomerId = customers.first.id);
+          }
+        }
+      } else {
+        if (customers.isNotEmpty) {
+          setState(() => _selectedCustomerId = customers.first.id);
+        }
       }
     });
   }
@@ -35,6 +48,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final now = DateTime.now();
     final String updateTime = DateFormat('HH:mm, dd/MM/yyyy').format(now);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final bool isUser = user?.role == 'user';
     
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -49,7 +65,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           final List<Customer> customers = customerProvider.allCustomers;
           if (customers.isEmpty) return const Center(child: Text('Không có dữ liệu khách hàng.'));
           
-          final selectedId = _selectedCustomerId ?? customers.first.id;
+          final selectedId = isUser
+              ? (customers.firstWhere((c) => c.code == user?.customerCode, orElse: () => customers.first).id)
+              : (_selectedCustomerId ?? customers.first.id);
           final selectedCustomer = customers.firstWhere((c) => c.id == selectedId, orElse: () => customers.first);
           
           return FutureBuilder<List<Bill>>(
@@ -65,7 +83,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildCustomerSelector(customers, selectedId!),
+                    if (!isUser) _buildCustomerSelector(customers, selectedId!),
                     _buildOverviewHeader(selectedCustomer, updateTime, customerBills),
                     _buildInfoGrid(selectedCustomer, customerBills),
                     _buildChartSection(chartData),
@@ -78,7 +96,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           );
         },
       ),
-      bottomNavigationBar: _buildBottomNav(context),
+      bottomNavigationBar: _buildBottomNav(context, user?.role),
     );
   }
 
@@ -335,22 +353,37 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  Widget _buildBottomNav(BuildContext context) => BottomNavigationBar(
-    type: BottomNavigationBarType.fixed,
-    currentIndex: 3, // Giả định thuộc phần cài đặt/thống kê
-    selectedItemColor: Colors.blue,
-    unselectedItemColor: Colors.grey,
-    onTap: (index) {
-      if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
-      if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.customerList);
-      if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.history);
-      if (index == 3) Navigator.pushReplacementNamed(context, AppRoutes.settings);
-    },
-    items: const [
-      BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-      BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Khách hàng'),
-      BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
-      BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
-    ],
-  );
+  Widget _buildBottomNav(BuildContext context, String? role) {
+    final bool isUser = role == 'user';
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      currentIndex: isUser ? 0 : 3, // highlight Trang chủ for user, Cài đặt for staff
+      selectedItemColor: Colors.blue,
+      unselectedItemColor: Colors.grey,
+      onTap: (index) {
+        if (isUser) {
+          if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
+          if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.history);
+          if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.settings);
+        } else {
+          if (index == 0) Navigator.pushReplacementNamed(context, AppRoutes.home);
+          if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.customerList);
+          if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.history);
+          if (index == 3) Navigator.pushReplacementNamed(context, AppRoutes.settings);
+        }
+      },
+      items: isUser
+          ? const [
+              BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+              BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+              BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
+            ]
+          : const [
+              BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+              BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Khách hàng'),
+              BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+              BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
+            ],
+    );
+  }
 }

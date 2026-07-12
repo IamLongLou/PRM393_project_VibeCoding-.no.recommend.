@@ -47,6 +47,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> with SingleTick
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.addCustomer),
+        icon: const Icon(Icons.person_add_alt_1_outlined),
+        label: const Text('Thêm KH', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+      ),
       body: SafeArea(
         child: Column(
           children: [

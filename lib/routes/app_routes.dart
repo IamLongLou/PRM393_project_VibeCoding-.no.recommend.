@@ -3,11 +3,11 @@ import '../screens/splash/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/customer/customer_list_screen.dart';
+import '../screens/customer/add_customer_screen.dart';
 import '../screens/sync/sync_screen.dart';
 import '../screens/history/history_screen.dart';
 import '../screens/stats/statistics_screen.dart';
 import '../screens/settings/settings_screen.dart';
-import '../screens/profile/profile_screen.dart';
 import '../screens/profile/edit_profile_screen.dart';
 import '../screens/profile/change_password_screen.dart';
 
@@ -21,9 +21,9 @@ class AppRoutes {
   static const String history = '/history';
   static const String statistics = '/statistics';
   static const String settings = '/settings';
-  static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
   static const String changePassword = '/change-password';
+  static const String addCustomer = '/add-customer';
 
 
   static Map<String, WidgetBuilder> get routes => {
@@ -38,9 +38,9 @@ class AppRoutes {
     history: (context) => const HistoryScreen(),
     statistics: (context) => const StatisticsScreen(),
     settings: (context) => const SettingsScreen(),
-    profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
     changePassword: (context) => const ChangePasswordScreen(),
+    addCustomer: (context) => const AddCustomerScreen(),
 
   };
 }

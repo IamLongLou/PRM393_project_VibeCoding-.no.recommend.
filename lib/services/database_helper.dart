@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -35,8 +35,7 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         address TEXT NOT NULL,
         phone TEXT NOT NULL,
-        currentReading INTEGER NOT NULL,
-        status INTEGER NOT NULL DEFAULT 0
+        currentReading INTEGER NOT NULL
       )
     ''');
 
@@ -101,6 +100,30 @@ class DatabaseHelper {
     if (oldVersion < 4) {
       await _addColumnIfMissing(db, 'bills', 'isPaid', 'INTEGER NOT NULL DEFAULT 0');
     }
+    if (oldVersion < 5) {
+      await db.transaction((txn) async {
+        final columns = await txn.rawQuery('PRAGMA table_info(customers)');
+        final hasStatus = columns.any((c) => c['name'] == 'status');
+        if (hasStatus) {
+          await txn.execute('''
+            CREATE TABLE customers_temp (
+              id INTEGER PRIMARY KEY,
+              code TEXT NOT NULL UNIQUE,
+              name TEXT NOT NULL,
+              address TEXT NOT NULL,
+              phone TEXT NOT NULL,
+              currentReading INTEGER NOT NULL
+            )
+          ''');
+          await txn.execute('''
+            INSERT INTO customers_temp (id, code, name, address, phone, currentReading)
+            SELECT id, code, name, address, phone, currentReading FROM customers
+          ''');
+          await txn.execute('DROP TABLE customers');
+          await txn.execute('ALTER TABLE customers_temp RENAME TO customers');
+        }
+      });
+    }
   }
 
   Future<void> _addColumnIfMissing(Database db, String table, String column, String type) async {
@@ -160,6 +183,23 @@ class DatabaseHelper {
 
   Future<void> insertBill(Bill bill) async {
     final db = await database;
+    // Kiểm tra xem hóa đơn với billCode này đã có ở local chưa
+    final existing = await db.query(
+      'bills',
+      where: 'billCode = ?',
+      whereArgs: [bill.billCode],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      final localBill = Bill.fromMap(existing.first);
+      // Nếu hóa đơn local chưa đồng bộ (isSynced == false),
+      // thì KHÔNG ghi đè bằng dữ liệu từ server, vì bản local có
+      // thay đổi offline chưa được đẩy lên (vd: đã đánh dấu thanh toán).
+      if (!localBill.isSynced) {
+        debugPrint('insertBill: bỏ qua ghi đè bill chưa sync: ${bill.billCode}');
+        return;
+      }
+    }
     await db.insert('bills', bill.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

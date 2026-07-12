@@ -5,6 +5,7 @@ import '../../models/customer.dart';
 import '../../models/bill.dart';
 import '../../providers/billing_provider.dart';
 import '../../providers/customer_provider.dart';
+import '../../providers/sync_provider.dart';
 import '../../services/billing_service.dart';
 import 'receipt_screen.dart';
 import 'package:intl/intl.dart';
@@ -71,8 +72,11 @@ class PaymentScreen extends StatelessWidget {
 
     final billingProvider = context.read<BillingProvider>();
     final customerProvider = context.read<CustomerProvider>();
+    final syncProvider = context.read<SyncProvider>();
     await billingProvider.saveBill(bill);
     await customerProvider.fetchLocal();
+    // Cập nhật badge đồng bộ ngay sau khi tạo hóa đơn offline mới
+    await syncProvider.fetchUnsyncedBills();
     if (!context.mounted) return;
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReceiptScreen(customer: customer, bill: bill)));
   }

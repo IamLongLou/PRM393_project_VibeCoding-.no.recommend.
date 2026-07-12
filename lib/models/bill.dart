@@ -37,8 +37,8 @@ class Bill {
     vat: (map['vat'] as num).toDouble(),
     totalAmount: (map['totalAmount'] as num).toDouble(),
     imagePath: map['imagePath'],
-    isSynced: map['isSynced'] == 1 || map['isSynced'] == true,
-    isPaid: map['isPaid'] == 1 || map['isPaid'] == true,
+    isSynced: map['isSynced'] == 1 || map['isSynced'] == true || map['synced'] == 1 || map['synced'] == true,
+    isPaid: map['isPaid'] == 1 || map['isPaid'] == true || map['paid'] == 1 || map['paid'] == true,
   );
 
   Bill copyWith({int? id, int? customerId, String? customerName, String? customerCode, String? billCode, DateTime? date, int? oldReading, int? newReading, double? consumption, double? unitPrice, double? amount, double? vat, double? totalAmount, String? imagePath, bool? isSynced, bool? isPaid}) {

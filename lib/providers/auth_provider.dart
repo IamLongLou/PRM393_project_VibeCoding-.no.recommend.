@@ -26,9 +26,9 @@ class AuthProvider with ChangeNotifier {
     // 1. Gọi API Online thật
     final response = await ApiService.login(username, password);
 
-    if (response != null) {
-      final userData = response['user'];
-      final token = response['token'];
+    if (response.data != null) {
+      final userData = response.data!['user'];
+      final token = response.data!['token'];
 
       _user = User(
         username: userData['username'],
@@ -45,7 +45,8 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
-    } else {
+    } else if (!response.serverReachable) {
+      // Mất mạng hoàn toàn → fallback offline (chỉ kiểm tra username)
       final last = await _db.getLastSession();
       if (last != null && last.username == username) {
         _user = last; 
@@ -54,6 +55,7 @@ class AuthProvider with ChangeNotifier {
         return true;
       }
     }
+    // Server từ chối (sai mật khẩu) → không cho phép đăng nhập
     _isLoading = false; 
     notifyListeners();
     return false;
@@ -71,29 +73,80 @@ class AuthProvider with ChangeNotifier {
     if (_user == null) return false;
     _isLoading = true; 
     notifyListeners();
-    // Simulate API update
-    await Future.delayed(const Duration(milliseconds: 500));
-    _user = User(
-      username: _user!.username,
-      fullName: name,
-      role: _user!.role,
-      email: email,
-      phone: phone,
-    );
-    await _db.saveSession(_user!, null);
+    try {
+      final db = DatabaseHelper.instance;
+      final dbInstance = await db.database;
+      final rows = await dbInstance.query(
+        'user_session',
+        columns: ['token'],
+        where: 'username = ?',
+        whereArgs: [_user!.username],
+        limit: 1,
+      );
+      final token = rows.isNotEmpty ? rows.first['token'] as String? : null;
+
+      final result = await ApiService.updateProfile(
+        username: _user!.username,
+        fullName: name,
+        email: email,
+        phone: phone,
+        token: token,
+      );
+
+      if (result != null) {
+        _user = User(
+          username: result['username'] ?? _user!.username,
+          fullName: result['fullName'] ?? name,
+          role: result['role'] ?? _user!.role,
+          email: result['email'] ?? email,
+          phone: result['phone'] ?? phone,
+          customerCode: result['customerCode'] ?? _user!.customerCode,
+        );
+        await _db.saveSession(_user!, token);
+        _isLoading = false; 
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('updateProfile error: $e');
+    }
     _isLoading = false; 
     notifyListeners();
-    return true;
+    return false;
   }
 
   Future<bool> changePassword(String oldPass, String newPass) async {
-    _isLoading = true; 
+    if (_user == null) return false;
+    _isLoading = true;
     notifyListeners();
-    // Simulate API update
-    await Future.delayed(const Duration(milliseconds: 800));
-    _isLoading = false; 
-    notifyListeners();
-    return true;
+    try {
+      // Lấy token đang lưu trong session để gửi lên API
+      final db = DatabaseHelper.instance;
+      final dbInstance = await db.database;
+      final rows = await dbInstance.query(
+        'user_session',
+        columns: ['token'],
+        where: 'username = ?',
+        whereArgs: [_user!.username],
+        limit: 1,
+      );
+      final token = rows.isNotEmpty ? rows.first['token'] as String? : null;
+
+      final success = await ApiService.changePassword(
+        _user!.username,
+        oldPass,
+        newPass,
+        token: token,
+      );
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      debugPrint('changePassword error: $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> logout() async {

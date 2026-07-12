@@ -1,9 +1,13 @@
 package com.example.waterbilling.service;
 
 import com.example.waterbilling.dto.CustomerDto;
+import com.example.waterbilling.entity.AppUser;
+import com.example.waterbilling.entity.UserRole;
 import com.example.waterbilling.entity.CollectionStatus;
 import com.example.waterbilling.entity.Customer;
+import com.example.waterbilling.repository.AppUserRepository;
 import com.example.waterbilling.repository.CustomerRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,9 +16,13 @@ import java.util.List;
 @Service
 public class CustomerService {
     private final CustomerRepository customerRepository;
+    private final AppUserRepository appUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public CustomerService(CustomerRepository customerRepository) {
+    public CustomerService(CustomerRepository customerRepository, AppUserRepository appUserRepository, PasswordEncoder passwordEncoder) {
         this.customerRepository = customerRepository;
+        this.appUserRepository = appUserRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<CustomerDto> getAll(String query) {
@@ -41,7 +49,21 @@ public class CustomerService {
         customer.setPhone(dto.phone());
         customer.setCurrentReading(dto.currentReading() == null ? 0 : dto.currentReading());
         customer.setStatus(dto.statusEnum());
-        return CustomerDto.from(customerRepository.save(customer));
+        Customer savedCustomer = customerRepository.save(customer);
+
+        // Tạo tài khoản đăng nhập app user tự động cho khách hàng
+        AppUser appUser = new AppUser();
+        // Dùng mã khách hàng (dạng viết thường) làm username đăng nhập
+        appUser.setUsername(savedCustomer.getCode().toLowerCase());
+        appUser.setFullName(savedCustomer.getName());
+        appUser.setPasswordHash(passwordEncoder.encode("123456"));
+        appUser.setRole(UserRole.USER);
+        appUser.setEmail(null);
+        appUser.setPhone(savedCustomer.getPhone());
+        appUser.setCustomer(savedCustomer);
+        appUserRepository.save(appUser);
+
+        return CustomerDto.from(savedCustomer);
     }
 
     @Transactional

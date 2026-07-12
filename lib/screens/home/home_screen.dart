@@ -76,6 +76,7 @@ class HomeScreen extends StatelessWidget {
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(weatherIcon, color: iconColor, size: 20),
               const SizedBox(width: 6),
@@ -114,8 +115,15 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text('Chào ${user?.fullName}👋', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        const Spacer(),
+                        Expanded(
+                          child: Text(
+                            'Chào ${user?.fullName}👋',
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         _buildWeatherCard(),
                       ],
                     ),
@@ -135,8 +143,6 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 15),
                     _buildFunctionGrid(context, user?.role ?? 'user'),
-                    const SizedBox(height: 20),
-                    _buildNoticeBanner(context, user?.role ?? 'user'),
                   ],
                 ),
               ),
@@ -176,10 +182,35 @@ class HomeScreen extends StatelessWidget {
           ),
           const Spacer(),
           InkWell(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=$name&background=random'),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.settings),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade400, Colors.blue.shade700],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name.trim()[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -211,44 +242,93 @@ class HomeScreen extends StatelessWidget {
     return FutureBuilder<List<Bill>>(
       future: Provider.of<BillingProvider>(context, listen: false).getAllBills(),
       builder: (context, snapshot) {
-        double totalAmount = 0;
-        String dueDateStr = 'Không có nợ';
+        double totalUnpaid = 0;
+        String dueDateStr = '';
         bool hasDebt = false;
-        
+
         if (snapshot.hasData && snapshot.data != null) {
-          final userBills = snapshot.data!.where((b) => b.customerCode == user.customerCode).toList();
-          if (userBills.isNotEmpty) {
-            userBills.sort((a, b) => b.date.compareTo(a.date));
-            
-            // Cộng dồn toàn bộ số tiền cần thanh toán của tất cả hóa đơn
-            totalAmount = userBills.fold(0, (sum, bill) => sum + bill.totalAmount);
-            
-            final latestBill = userBills.first;
-            final dueDate = latestBill.date.add(const Duration(days: 15));
-            dueDateStr = FormatterUtils.formatDate(dueDate, pattern: 'dd/MM/yyyy');
+          // Chỉ tính hóa đơn của CHÍNH khách hàng này và CHƯA thanh toán
+          final unpaidBills = snapshot.data!
+              .where((b) => b.customerCode == user.customerCode && !b.isPaid)
+              .toList();
+
+          if (unpaidBills.isNotEmpty) {
+            totalUnpaid = unpaidBills.fold(0.0, (sum, b) => sum + b.totalAmount);
             hasDebt = true;
+
+            // Hạn thanh toán: ngày 3 của tháng TIẾP THEO
+            final now = DateTime.now();
+            final dueDate = DateTime(now.year, now.month + 1, 3);
+            dueDateStr = FormatterUtils.formatDate(dueDate, pattern: 'dd/MM/yyyy');
           }
         }
 
-        final formattedAmount = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(totalAmount);
+        final formattedAmount = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(totalUnpaid);
 
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
+            gradient: hasDebt
+                ? const LinearGradient(
+                    colors: [Color(0xFF1565C0), Color(0xFF0288D1)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
             borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: (hasDebt ? Colors.blue : Colors.green).withValues(alpha: 0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              )
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Số tiền cần thanh toán:', style: TextStyle(fontSize: 14, color: Colors.black54)),
-              const SizedBox(height: 5),
-              Text(formattedAmount, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue)),
-              const SizedBox(height: 10),
-              if (hasDebt) 
-                Text('Hạn thanh toán: $dueDateStr', style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold))
-              else 
-                const Text('Bạn đã thanh toán đầy đủ', style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Icon(
+                    hasDebt ? Icons.receipt_long : Icons.check_circle_outline,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    hasDebt ? 'Số tiền cần thanh toán' : 'Trạng thái thanh toán',
+                    style: const TextStyle(fontSize: 13, color: Colors.white70),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                hasDebt ? formattedAmount : 'Đã thanh toán đầy đủ ✓',
+                style: TextStyle(
+                  fontSize: hasDebt ? 28 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              if (hasDebt) ...
+              [
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '⏰ Hạn thanh toán: $dueDateStr',
+                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -344,11 +424,10 @@ class HomeScreen extends StatelessWidget {
             _funcCard(context, 'Lịch sử', 'Nhật ký hoạt động & biên lai đã xuất', Icons.history, Colors.grey, AppRoutes.history),
           ];
         } else {
+          // Khách hàng thường: chỉ 2 menu — Lịch sử & Thống kê
           cards = [
-            _funcCard(context, 'Khách hàng', 'Xem hóa đơn tiền nước tháng này', Icons.people_outline, Colors.blue, AppRoutes.history),
-            _funcCard(context, 'Thanh toán', 'Thanh toán trực tuyến an toàn', Icons.account_balance_wallet_outlined, Colors.green, AppRoutes.home),
-            _funcCard(context, 'Lịch sử', 'Lịch sử sử dụng nước & thanh toán', Icons.history, Colors.purple, AppRoutes.history),
-            _funcCard(context, 'Hỗ trợ', 'Gửi yêu cầu hỗ trợ kỹ thuật', Icons.support_agent_outlined, Colors.orange, AppRoutes.settings),
+            _funcCard(context, 'Lịch sử', 'Lịch sử sử dụng nước & thanh toán của bạn', Icons.history, Colors.blue, AppRoutes.history),
+            _funcCard(context, 'Thống kê', 'Biểu đồ tiêu thụ & chi phí của bạn', Icons.bar_chart, Colors.purple, AppRoutes.statistics),
           ];
         }
 
@@ -441,70 +520,28 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNoticeBanner(BuildContext context, String role) {
-    bool isUser = role == 'user';
-    String title = isUser ? 'Lịch bảo trì' : 'Thông báo hệ thống';
-    String message = isUser 
-      ? 'Khu vực của bạn sẽ tạm ngừng cấp nước từ 23h đêm nay để bảo trì định kỳ. Quý khách vui lòng dự trữ nước.'
-      : 'Khu vực Hòa Lạc, huyện Thạch Thất đang có sự cố mất nước ở trường ĐH FPT. Vui lòng nhắc nhở sinh viên ngừng đến trường.';
-    IconData icon = isUser ? Icons.build_circle_outlined : Icons.info_outline;
-    Color color = isUser ? Colors.orange : Colors.blue;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-      
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white, 
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1), 
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
-                    Text('10 phút trước', style: TextStyle(color: isDark ? Colors.white54 : Colors.grey, fontSize: 10)),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  message, 
-                  style: TextStyle(
-                    color: isDark ? Colors.white70 : Colors.black54, 
-                    fontSize: 12, 
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomNav(BuildContext context, String role) {
+    if (role == 'user') {
+      // Khách hàng: chỉ Home, Lịch sử, Cài đặt
+      return BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: 0,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          if (index == 0) return;
+          if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.history);
+          if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.settings);
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Cài đặt'),
+        ],
+      );
+    }
+
+    // Staff / admin: đầy đủ menu
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
       currentIndex: 0,
@@ -512,13 +549,7 @@ class HomeScreen extends StatelessWidget {
       unselectedItemColor: Colors.grey,
       onTap: (index) {
         if (index == 0) return;
-        if (index == 1) {
-          if (role == 'user') {
-             Navigator.pushReplacementNamed(context, AppRoutes.history);
-          } else {
-             Navigator.pushReplacementNamed(context, AppRoutes.customerList);
-          }
-        }
+        if (index == 1) Navigator.pushReplacementNamed(context, AppRoutes.customerList);
         if (index == 2) Navigator.pushReplacementNamed(context, AppRoutes.history);
         if (index == 3) Navigator.pushReplacementNamed(context, AppRoutes.settings);
       },

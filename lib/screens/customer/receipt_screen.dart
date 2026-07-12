@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../providers/customer_provider.dart';
 import '../../models/customer.dart';
@@ -115,6 +116,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   Widget build(BuildContext context) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final bool isUser = user?.role == 'user';
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -171,7 +176,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   Text(
                     _isPaid
                         ? 'Khách hàng đã thanh toán thành công'
-                        : 'Chờ khách hàng thanh toán tiền mặt',
+                        : (isUser ? 'Vui lòng thanh toán tiền mặt cho nhân viên thu tiền' : 'Chờ khách hàng thanh toán tiền mặt'),
                     style: const TextStyle(color: Colors.grey, fontSize: 13),
                   ),
                 ],
@@ -180,10 +185,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             const SizedBox(height: 20),
 
             // Hiển thị cảnh báo nợ cũ và hỗ trợ thanh toán hàng loạt
-            if (!_isLoadingOldBills && _unpaidOldBills.isNotEmpty) ..._buildOldBillsWarning(format, isDark),
+            if (!_isLoadingOldBills && _unpaidOldBills.isNotEmpty) ..._buildOldBillsWarning(format, isDark, isUser),
 
             // Nút xác nhận thanh toán kỳ hiện tại (chỉ hiện khi chưa thanh toán kỳ này)
-            if (!_isPaid) ..._buildPaymentConfirmButton(format),
+            if (!_isPaid && !isUser) ..._buildPaymentConfirmButton(format),
 
             Screenshot(
               controller: _screenshotController,
@@ -217,7 +222,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 
   /// Khối UI hiển thị dư nợ cũ và nút thu toàn bộ
-  List<Widget> _buildOldBillsWarning(NumberFormat format, bool isDark) {
+  List<Widget> _buildOldBillsWarning(NumberFormat format, bool isDark, bool isUser) {
     // Dùng _isPaid (state local) thay vì widget.bill.isPaid (immutable)
     final double totalCollect = _isPaid ? _totalOldDebt : (_totalOldDebt + widget.bill.totalAmount);
     return [
@@ -277,54 +282,56 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 15),
-            // Nút gom toàn bộ nợ
-            ElevatedButton.icon(
-              onPressed: () async {
-                final syncProvider = context.read<SyncProvider>();
-                final customerProvider = context.read<CustomerProvider>();
-                
-                // 1. Cập nhật hóa đơn hiện tại nếu chưa thanh toán
-                if (!_isPaid && widget.bill.id != null) {
-                  await DatabaseHelper.instance.markBillAsPaid(widget.bill.id!);
-                }
-                
-                // 2. Cập nhật tất cả các hóa đơn nợ cũ của khách hàng
-                await DatabaseHelper.instance.markAllBillsAsPaidForCustomer(widget.customer.id!);
-                
-                // 3. Đồng bộ các Provider để giao diện thay đổi tức thì
-                await syncProvider.fetchUnsyncedBills();
-                await customerProvider.fetchLocal();
+            if (!isUser) ...[
+              const SizedBox(height: 15),
+              // Nút gom toàn bộ nợ
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final syncProvider = context.read<SyncProvider>();
+                  final customerProvider = context.read<CustomerProvider>();
+                  
+                  // 1. Cập nhật hóa đơn hiện tại nếu chưa thanh toán
+                  if (!_isPaid && widget.bill.id != null) {
+                    await DatabaseHelper.instance.markBillAsPaid(widget.bill.id!);
+                  }
+                  
+                  // 2. Cập nhật tất cả các hóa đơn nợ cũ của khách hàng
+                  await DatabaseHelper.instance.markAllBillsAsPaidForCustomer(widget.customer.id!);
+                  
+                  // 3. Đồng bộ các Provider để giao diện thay đổi tức thì
+                  await syncProvider.fetchUnsyncedBills();
+                  await customerProvider.fetchLocal();
 
-                if (mounted) {
-                  setState(() {
-                    _isPaid = true;
-                    _unpaidOldBills = [];
-                    _totalOldDebt = 0.0;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '✅ Đã thu thành công toàn bộ dư nợ ${format.format(totalCollect)} của khách hàng ${widget.customer.name}',
+                  if (mounted) {
+                    setState(() {
+                      _isPaid = true;
+                      _unpaidOldBills = [];
+                      _totalOldDebt = 0.0;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '✅ Đã thu thành công toàn bộ dư nợ ${format.format(totalCollect)} của khách hàng ${widget.customer.name}',
+                        ),
+                        backgroundColor: Colors.green,
                       ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: Text(
-                'THU TOÀN BỘ DƯ NỢ (${format.format(totalCollect)})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.check_circle_outline, size: 20),
+                label: Text(
+                  'THU TOÀN BỘ DƯ NỢ (${format.format(totalCollect)})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-            ),
+            ],
           ],
         ),
       ),
