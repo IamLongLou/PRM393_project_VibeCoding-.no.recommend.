@@ -1,3 +1,4 @@
+import 'package:electric_water_billing/providers/connectivity_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,6 @@ import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../core/utils/formatter_utils.dart';
 import '../../core/constants/app_strings.dart';
-
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -338,30 +338,43 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildReadyBanner(BuildContext context) {
     final syncProvider = Provider.of<SyncProvider>(context);
-    final lastSyncTime = syncProvider.lastSyncTime;
-    final String lastSync = lastSyncTime != null 
-        ? DateFormat('HH:mm a').format(lastSyncTime)
+    final isOnline = Provider.of<ConnectivityProvider>(context).isOnline;
+    final pendingCount = syncProvider.unsyncedBills.length;
+    final lastSync = syncProvider.lastSyncTime != null
+        ? DateFormat('HH:mm a').format(syncProvider.lastSyncTime!)
         : 'Chưa đồng bộ';
+
+    final Color color = !isOnline
+        ? Colors.orange
+        : (pendingCount > 0 ? Colors.blue : Colors.green);
+    final String title = !isOnline
+        ? 'Đang ngoại tuyến'
+        : (pendingCount > 0 ? 'Có $pendingCount hóa đơn chờ đồng bộ' : 'Dữ liệu đã sẵn sàng');
+    final String badge = !isOnline ? 'Ngoại tuyến' : (pendingCount > 0 ? 'Chờ đồng bộ' : 'Ổn định');
+    final IconData icon = !isOnline
+        ? Icons.cloud_off_rounded
+        : (pendingCount > 0 ? Icons.sync_problem : Icons.check_circle);
+
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(15)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(15)),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, color: Colors.green),
+          Icon(icon, color: color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Dữ liệu đã sẵn sàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
                 Text('Đồng bộ lần cuối: $lastSync', style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)),
-            child: const Text('Ổn định', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: color)),
+            child: Text(badge, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

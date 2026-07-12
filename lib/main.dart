@@ -7,6 +7,7 @@ import 'providers/customer_provider.dart';
 import 'providers/billing_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/connectivity_provider.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
@@ -20,6 +21,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => BillingProvider()),
         ChangeNotifierProvider(create: (_) => SyncProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],
       child: const MyApp(),
     ),
